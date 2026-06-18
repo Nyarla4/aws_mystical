@@ -1,0 +1,946 @@
+%!
+
+% arg and dict_safe_func are more generally needed
+
+(dmmlib/base.ps) run
+
+/mystical_dict 30 dict def
+mystical_dict begin
+
+% load other dmmlib functions inside mystical_dict 
+% to avoid polluting user namespace
+(dmmlib/textbase.ps) run
+(dmmlib/lines.ps) run
+(dmmlib/polar.ps) run
+
+
+/ring_debug false def
+/type_debug false def
+% ring_spacing is distance from parent ring radius to child ring full_radius
+% ring_spacing needs to be at least 1
+/ring_spacing 2 def
+/ring_width 1 def
+/std_sigil_width 1.25 def
+% sibling_spacing is distance between rings with same parent
+/sibling_spacing 0.5 def
+/sibling_hs sibling_spacing half def
+/ring_halfwidth ring_width half def
+/buffer 100 string def
+/Zapf-Chancery 0.5 selectfont
+/nonsigil_spacing 0.125 def
+/cartouche_radius 0.25 def
+/comment_shrink_factor 2 def
+/kerning true def
+/compact_wrapper true def
+/nib_angle -60 def
+
+/nib_matrix matrix currentmatrix def
+/set_nib_matrix {
+    /nib_matrix matrix currentmatrix def
+} def
+/nstroke {
+    gsave
+        nib_matrix setmatrix
+        24 recip setlinewidth
+        nib_angle rotate
+        0.5 1 scale
+        0.5 callistroke
+    grestore
+    newpath
+} def
+/ndot {
+    gsave
+        translate
+        % nib_matrix setmatrix
+        nib_angle rotate
+        0.75 1 scale
+        0 0 16 recip spcircle fill
+    grestore
+} def
+% /nstroke {stroke} def
+
+/draw_ring [/Spell] {
+    Spell begin
+        24 recip setlinewidth
+        set_nib_matrix
+        % borders based on rtype
+        rtype /dicttype eq {
+            components length circumference cvi maximum
+            dup { radius ring_halfwidth add 0 goto } circrepeat
+            closepath whitefill nstroke
+            dup { radius ring_halfwidth 0.75 mul add 0 goto } circrepeat
+            closepath nstroke
+            { radius ring_halfwidth sub 0 goto } circrepeat
+            closepath nstroke
+        } {
+            rtype /comment eq {
+                0 0 radius 0 90 sparc boltstroke
+                0 0 radius 0 -90 sparcn boltstroke
+            } {
+                0 0 radius ring_halfwidth add circle whitefill nstroke
+                0 0 radius ring_halfwidth sub circle nstroke
+            } ifelse
+        } ifelse
+        rtype /comment eq {
+            gsave
+                -90 rotate
+                comment_shrink_factor recip softscale
+                X_center
+                comment_text 0.75 radius comment_shrink_factor mul circular_balloon_show pop
+            grestore
+        } {
+            % draw each ring element
+            components { /Token arg
+                gsave
+                    Token /aflag get {
+                        Token draw_link
+                    } if
+                    Token /aflag get not Token /defligature known or {
+                        Token draw_sigil
+                    } if
+                grestore
+            } forall
+            % star for xarray
+            rtype /xarray eq {
+                /comp_n components length def
+                /star_radius radius ring_halfwidth sub def
+                comp_n 2 le {
+                    5 { star_radius half 0 goto } 2 schlafrepeat closepath nstroke
+                } {
+                    /full_step comp_n 2 mul 5 idiv def
+                    /star_rings comp_n full_step gcd def
+                    /star_points comp_n star_rings idiv def
+                    /star_step full_step star_rings idiv def
+                    0 1 star_rings 1 sub {
+                        gsave
+                            % dup star_rings div 360 mul setkatebowcolor
+                            360 comp_n div mul rotate
+                            star_points {star_radius 0 goto} star_step schlafrepeat 
+                            closepath nstroke
+                        grestore
+                    } for
+                } ifelse
+            } if
+        } ifelse
+        % debug ring positions
+        ring_debug {
+            gsave
+                1 0 0 setrgbcolor
+                0 0 radius circle stroke
+                0 1 0 setrgbcolor
+                0 0 full_radius circle stroke
+            grestore
+        } if
+    end
+} 0 false dict_safe_func
+
+% determine if a token should be drawn in a triangle
+/isname {
+    dup /otype get /nametype eq exch /xflag get not and
+} def
+
+% sigil_bank is in the other file
+(sigils.ps) run
+/draw_sigil [/Token] {
+    Token begin
+    gsave
+        angle rotate
+        parent /radius get 0 translate
+        set_nib_matrix
+        Token isname {
+            gsave
+                3 {
+                    -1 0 goto
+                } circrepeat closepath nstroke
+            grestore
+        } if
+        sigil_bank name known otype /stringtype ne and {
+            gsave
+                otype /return ne {
+                    90 rotate
+                } if
+                otype /stringtype eq {
+                    % sigil cartouche
+                    0 0 ring_halfwidth spcircle nstroke
+                } if
+                otype /return ne {
+                    0.75 softscale
+                } if
+                sigil_bank name get exec
+                otype /return eq parent /root known and {
+                    0.5 0 goto 1 0 goto nstroke
+                } if
+            grestore
+        } {
+            90 rotate
+            gsave
+                /textrad parent /radius get def
+                0 textrad translate
+                otype /stringtype eq {
+                    name
+                } {
+                    name buffer cvs
+                } ifelse
+                textrad neg circle_center_show
+                otype /stringtype eq {
+                    /cartouche_outer_width width nonsigil_spacing sub def
+                    cartouche_outer_width cartouche_radius 2 mul ge {
+                        /cartouche_inner_width cartouche_outer_width cartouche_radius 2 mul sub def
+                        /text_angle cartouche_inner_width PI textrad mul div 180 mul half def
+                        /left_angle -90 text_angle sub def
+                        /right_angle -90 text_angle add def
+                        text_angle 90 gt {
+                            0 0 textrad cartouche_radius sub left_angle -90 sparc
+                            0 0 textrad cartouche_radius sub -90 right_angle sparc
+                        } {
+                            0 0 textrad cartouche_radius sub left_angle right_angle sparc
+                        } ifelse
+                        right_angle rotate
+                        textrad 0 cartouche_radius 180 0 sparcn
+                        right_angle neg rotate
+                        text_angle 90 gt {
+                            0 0 textrad cartouche_radius add right_angle -90 sparcn
+                            0 0 textrad cartouche_radius add -90 left_angle sparcn
+                        } {
+                            0 0 textrad cartouche_radius add right_angle left_angle sparcn
+                        } ifelse
+                        left_angle rotate
+                        textrad 0 cartouche_radius 0 180 sparcn
+                        left_angle neg rotate
+                        closepath
+                        nstroke
+                    } {
+                        % too small for cartouche, ellipse
+                        0 textrad neg cartouche_outer_width half cartouche_radius 0 180 spell 
+                        0 textrad neg cartouche_outer_width half cartouche_radius 180 0 spell
+                        nstroke
+                    } ifelse
+                } if
+            grestore
+        } ifelse
+        type_debug {
+            otype /return ne {
+                0 -0.75 translate
+                2 recip softscale
+                xflag {
+                    /Times-Bold 0.5 selectfont
+                } if
+                otype buffer cvs centershow
+            } if
+        } if
+    grestore
+    end
+} 0 false dict_safe_func
+/get_r0 {
+    % Token is defined
+    parent /radius get
+    Token /defligature known {
+        ring_halfwidth add
+    } if
+    ring /rtype get /comment eq {
+        ring_halfwidth 1.25 mul add
+    } if
+} def
+/draw_link [/Token] {
+    Token begin
+    gsave
+        /r4 parent /radius get Token /offset get add def
+        /r0 get_r0 def
+        /r3 r4 ring /radius get sub 
+            ring /rtype get /comment ne {
+                ring_halfwidth sub 
+            } if
+        def
+        /rstep r3 r0 sub 3 div def
+        /r1 r0 rstep add def
+        /r2 r1 rstep add def
+        angle rotate
+        /local_angle ring_angle angle sub def
+        set_nib_matrix
+        r0 0 polar goto
+        r1 0 polar
+        r2 local_angle polar
+        r3 local_angle polar curveto
+        ring /rtype get /comment eq {
+            reversepath boltstroke
+        } {
+            nstroke
+        } ifelse
+        ring /rtype get /comment ne {
+            r0 0 polar
+            ring /rtype get /xarray eq {
+                0.125 spcircle whitefill nstroke
+            } {
+                ndot
+            } ifelse
+        } if
+        local_angle rotate
+        r4 0 translate
+        180 rotate
+        ring draw_ring
+    grestore
+    % ring debug
+    ring_debug parent /wrapper known not and {
+        gsave
+            1 0.5 0 setrgbcolor
+            gsave
+                ring_angle rotate
+                0 0 goto
+                0 0 r4 
+                ring /full_radius get r4 div asin dup neg arcn
+                closepath stroke
+            grestore
+        grestore
+    } if
+    end
+} 0 false dict_safe_func
+
+% end of drawing functions
+
+/handlecode { /code arg /Ring arg
+    Ring code 0 parsecode pop
+    Ring 0 layoutring
+} def
+
+% modifies Ring in place to reflect the instructions starting at code[code_pos]
+/parsecode [/Ring /code /code_pos] {
+    10 dict begin
+        % Ring: Ring object to write into, type is set
+        % code:  input code
+        % code_pos: position in code being parsed
+
+        /i 0 def
+        /code_len code length def
+
+        Ring /cursor 0 put
+        Ring /components code_len 1 add code_pos sub array put
+        
+        code_len 0 gt {
+            {
+                /Token << >> def
+                /parent Ring def
+                /components Ring /components get def
+                /cursor Ring /cursor get def
+                components cursor Token put
+                % careful not to execute code piece before cvlit
+                code code_pos get
+                dup type cvlit /otype arg
+                dup xcheck /xflag arg
+                cvlit /literal arg
+                /aflag otype /arraytype eq def
+                otype /stringtype eq {
+                    /literal_s literal def
+                } {
+                    /literal_s literal buffer cvs def
+                } ifelse
+
+                /skip_token false def
+                % check for def-ligature
+                Ring /rtype get /xarray eq literal /def eq xflag and and {
+                    cursor 2 ge {
+                        % prev is true circle
+                        /previous components cursor 1 sub get def
+                        /candidate components cursor 2 sub get def
+                        previous /aflag get previous isname not and {
+                            candidate /aflag get not candidate isname and {
+                                % set up ligature - add ring info to name
+                                [/ring /aflag] { /field arg
+                                    candidate field
+                                    previous field get 
+                                    put
+                                } forall
+                                candidate /ring get /container candidate put
+                                candidate /defligature true put
+                                /cursor -2 adddef
+                                /skip_token true def
+                                /code_pos 1 adddef
+                            } if
+                        } if
+                    } if
+                } if
+                % check for comment
+                literal /mystical_comment_flag eq {
+                    % we are checking 1 back and 2 forward
+                    % expected syntax: (comment) /mystical_comment_flag pop pop
+                    cursor 1 ge code_pos 2 add code_len lt and {
+                        /comment_ok true def
+                        /candidate components cursor 1 sub get def
+                        candidate /otype get /stringtype ne {
+                            /comment_ok false def
+                        } if
+                        code code_pos 1 add get /pop ne {
+                            /comment_ok false def
+                        } if
+                        code code_pos 2 add get /pop ne {
+                            /comment_ok false def
+                        } if
+                        comment_ok {
+                            /comment_text candidate /name get def
+                            /comment_ring <<
+                                /aflag true
+                                /rtype /comment
+                                /components []
+                                /ring_components []
+                                /comment_text comment_text
+                                /container candidate
+                                /radius comment_text 0.75 find_circular_balloon_radius comment_shrink_factor div
+                            >> def
+                            comment_ring /circumference comment_ring /radius get 2 mul PI mul put
+                            candidate /aflag true put
+                            candidate /ring comment_ring put
+                            candidate /name (%) put
+                            candidate /width 0 put
+                            /skip_token true def
+                            /code_pos 3 adddef
+                            /cursor -1 adddef
+                        } if
+                    } if
+                } if
+                /cursor 1 adddef
+                Ring /cursor cursor put
+                skip_token not {
+                    % [ for vi
+                    % don't otherwise deal with these tokens
+                    literal_s (]) eq { exit } if
+                    literal_s (>>) eq { exit } if
+                    literal_s ([) eq literal_s (<<) eq or {
+                        % ] for vi
+                        /array_ring << /rtype literal_s (<<) eq {/dicttype} {/array} ifelse >> def
+                        Token /ring array_ring put
+                        array_ring /container Token put
+                        Token /signal true put
+                        /code_pos 1 adddef
+                        array_ring code code_pos parsecode /code_pos arg
+                        Token /name array_ring /rtype get put
+                        /aflag true def
+                    } {
+                        % Handle recursion for arrays
+                        otype /arraytype eq otype /dicttype eq or {
+                            /inner_ring <<
+                                /rtype xflag { 
+                                    /xarray 
+                                } { 
+                                    otype /arraytype eq {
+                                        /array 
+                                    } {
+                                        /dicttype
+                                    } ifelse
+                                } ifelse
+                            >> def
+                            otype /dicttype eq {
+                                /literal [literal {} forall] def
+                            } if
+                            Token /ring inner_ring put
+                            inner_ring /container Token put
+                            inner_ring literal 0 parsecode pop
+                            Token /name inner_ring /rtype get put
+                            /aflag true def
+                        } {
+                            Token /name literal put
+                        } ifelse
+                    } ifelse
+                    kerning {
+                        aflag {
+                            0.5
+                        } {
+                            sigil_bank literal known otype /stringtype ne and {
+                                std_sigil_width
+                            } {
+                                literal_s stringwidth pop
+                                nonsigil_spacing add
+                                otype /stringtype eq {
+                                    nonsigil_spacing add
+                                } if
+                            } ifelse
+                        } ifelse
+                        % even if text is short names must be sigil-width
+                        currentdict isname {
+                            std_sigil_width 1.25 mul max
+                        } if
+                    } {
+                        std_sigil_width
+                    } ifelse
+                    /width arg
+
+                    [/otype /xflag /aflag /width /parent] {
+                        Token exch dup cvx exec put
+                    } forall
+
+                    /code_pos 1 adddef
+                } if
+                code_pos code length ge { exit } if
+            } loop
+            % temporary shenanigans - cursor might be two off the end
+            components Ring /cursor get 1 sub get length 0 eq {
+                Ring /cursor -1 addput
+            } if
+        } if
+
+        % calculate positions for all tokens
+        /circumference 0.5 def
+        /cursor Ring /cursor get def
+        components 0 cursor getinterval { /component arg
+            % skip extraneous null at end
+            component type cvlit /dicttype eq {
+                /width component /width get def
+                component /position circumference width half add put
+                /circumference width adddef
+            } if
+        } forall
+        /components Ring /components get def
+
+        /end_token <<
+            /otype /return
+            /xflag false
+            /aflag false
+            /position circumference 0.5 add
+            /name Ring /rtype get /xarray eq { /RETURN } { /COMPLETE } ifelse
+            /parent Ring
+        >> def
+        components cursor end_token put
+        /cursor 1 adddef
+
+        % trim components to correct size
+        /components components 0 cursor getinterval def
+
+        % also make ring_components
+        /ring_component_count 0 def
+        components { /component arg
+            component /aflag get {
+                /ring_component_count 1 adddef
+            } if
+        } forall
+        /ring_components ring_component_count array def
+        /rci 0 def
+        components {
+            dup /aflag get {
+                ring_components exch rci exch put
+                /rci 1 adddef
+            } {
+                pop
+            } ifelse
+        } forall
+        rci ring_component_count ne {
+            [(rci ring_component_count mismatch) rci ring_component_count] == die
+        } if
+        % determine ring dimensions
+        /components components 0 cursor getinterval def
+        /circumference 0.5 adddef
+
+        % set angles of all sigils before messing with circumference
+        components { /component arg
+            /angle component /position get circumference div 360 mul def
+            component /angle angle put
+            component /position undef
+        } forall
+
+        /circumference circumference 2 PI mul maximum def
+        /radius circumference PI div half def
+
+        Ring /circumference circumference put
+        Ring /radius radius put
+        Ring /components components put
+        Ring /ring_components ring_components put
+        code_pos
+    end
+} 1 false dict_safe_func
+
+/set_offset { /inner_ring arg /source arg
+    inner_ring /wrapped known not {
+        source /offset
+        inner_ring /full_radius get ring_spacing add put
+    } if
+} def
+
+/layoutring [/Ring /depth] {
+        /components Ring /components get def
+        /ring_components Ring /ring_components get def
+        /radius Ring /radius get def
+        % detect wrapper if enabled
+        % since all other wrapper handling is based on presence of /wrapper,
+        % gating setting wrapper on the flag is sufficient
+        depth 0 eq compact_wrapper and {
+            /children 0 def
+            components {
+                /ring known { /children 1 adddef } if
+            } forall
+            children 1 eq {
+                Ring /wrapper true put
+            } if
+        } if
+        components {
+            /Token arg
+            Token /ring known {
+                /inner_ring Token /ring get def
+                Ring /wrapper known {
+                    inner_ring /wrapped true put
+                } if
+                inner_ring depth 1 add layoutring
+                Token inner_ring set_offset
+            } if
+        } forall
+
+        % layout
+
+        % find largest dependent ring
+        % also find how much bigger an envelope must be
+        % defaulting to ring thickess for rings
+        % and to 0 for comments
+        /max_sub 
+            Ring /rtype get /comment eq {
+                0
+            } {
+                ring_halfwidth 
+            } ifelse
+        def
+        % ordered list of components and their span info
+        /ring_spans ring_components length array def
+        /rci 0 def
+        ring_components { /component arg
+            /angle component /angle get def
+            component /ring_angle known not {
+                component /ring_angle angle put
+            } if
+            /c_ring component /ring get def
+            /sub_offset
+                c_ring /full_radius get component /offset get add 
+                def
+            sub_offset max_sub gt {
+                /max_sub sub_offset def
+            } if
+            % for figuring out angle positions we need:
+            % angle
+            % center_offset (ring radius plus offset)
+            % angle span (radius in either direction)
+            % none of this is needed if wrapper
+            Ring /wrapper known not {
+                /center_offset radius component /offset get add def
+                /angle_span c_ring /full_radius get sibling_hs add center_offset div asin def
+                /ring_span <<
+                    /ring c_ring
+                    /full_radius c_ring /full_radius get
+                    /ring_angle angle
+                    /center_offset center_offset
+                    /angle_span angle_span
+                >> def
+                ring_spans rci [component ring_span] put
+                /rci 1 adddef
+            } if
+        } forall
+
+        Ring /wrapper known not {
+            % if wrapped:
+            % find angle span for parent (ps)
+            % range goes from ps to 360 - ps instead of 0 to 360
+            % constrain wrapped to leave room for parent
+            Ring /wrapped known {
+                /container Ring /container get def
+                /parent_ring container /parent get def
+                % center offset for wrapped-to-wrapper
+                /parent_center_offset radius
+                    ring_halfwidth add
+                    ring_spacing add 
+                    parent_ring /radius get add 
+                    def
+                /parent_span parent_ring /radius get
+                    ring_halfwidth add sibling_hs add
+                    parent_center_offset div asin def
+            } if
+
+            /ring_spans ring_spans 0 rci getinterval def
+            ring_spans length 1 gt {
+                % check for everyone having room
+                /total_spans 0 def
+                ring_spans { aload pop /ring_span arg /component arg
+                    ring_span /angle_span get 2 mul total_spans add
+                    /total_spans arg
+                } forall
+                Ring /wrapped known {
+                    /total_spans parent_span 2 mul adddef
+                } if
+                Ring /total_spans total_spans put
+                total_spans 360 gt {
+                    % not enough room, push everyone out and space evenly
+                    /adjustment 360 total_spans div def
+                    /angle_tracker 0 def
+                    ring_spans { aload pop /ring_span arg /component arg
+                        /full_radius ring_span /full_radius get def
+                        /new_span ring_span /angle_span get adjustment mul def
+                        /increase
+                            full_radius sibling_hs add
+                            new_span sin div
+                            ring_span /center_offset get sub
+                        def
+                        /c_ring component /ring get def
+                        /new_offset component /offset get increase add def
+                        component /offset new_offset put
+                        /angle_span full_radius sibling_hs add new_offset radius add div asin def
+                        component /ring_angle angle_tracker angle_span add put
+                        /angle_tracker angle_span 2 mul adddef
+
+                        /sub_offset
+                            c_ring /full_radius get component /offset get add 
+                            def
+                        sub_offset max_sub gt {
+                            /max_sub sub_offset def
+                        } if
+                    } forall
+                } {
+                    % check for jostling
+                    % create endpoints
+                    /start_angle 0 def
+                    /end_angle 360 def
+                    Ring /wrapped known {
+                        /start_angle parent_span def
+                        /end_angle 360 parent_span sub def
+                    } if
+                    % create differential list
+                    /diff_list ring_spans length 1 add array def
+                    /last_span ring_spans length 1 sub def
+                    /last_diff ring_spans length def
+                    % first entry diffs from start_angle
+                    diff_list 0 
+                        ring_spans 0 get 1 get
+                        dup /ring_angle get exch /angle_span get sub
+                        start_angle sub
+                    put
+                    % middle entries diff from previous neighbor
+                    1 1 last_span { /i arg
+                        diff_list i
+                        /span_a ring_spans i 1 sub get 1 get def
+                        /span_b ring_spans i get 1 get def
+                        span_b dup /ring_angle get exch /angle_span get sub
+                        span_a dup /ring_angle get exch /angle_span get add sub 
+                        put
+                    } for
+                    % last entry diff from end_angle
+                    diff_list last_diff ring_spans last_span get 1 get
+                        dup /ring_angle get exch /angle_span get add
+                        end_angle exch sub
+                    put
+
+                    % calculate optimal diff_list
+                    % move negative edges to first positive neighbor
+                    0 1 last_diff { /i arg
+                        {
+                            diff_list i get start_angle ge { exit } if
+                            /left i 1 sub def
+                            {
+                                left 0 lt {exit} if
+                                diff_list left get 0 gt { exit } if
+                                /left -1 adddef
+                            } loop
+                            /right i 1 add def
+                            {
+                                right last_diff gt {exit} if
+                                diff_list right get 0 gt { exit } if
+                                /right 1 adddef
+                            } loop
+                            left 0 ge {
+                                right last_diff le {
+                                    % both sides available
+                                    /remove_amount 
+                                        diff_list left get
+                                        diff_list right get minimum
+                                        diff_list i get half minimum
+                                    def
+                                    diff_list left remove_amount addput
+                                    diff_list right remove_amount addput
+                                    diff_list i remove_amount -2 mul addput
+                                } {
+                                    % only left is available
+                                    /remove_amount diff_list left get diff_list i get minimum def
+                                    diff_list left remove_amount addput
+                                    diff_list i remove_amount neg addput
+                                } ifelse
+                            } {
+                                % left is off side
+                                right last_diff le {
+                                    % only right is available
+                                    /remove_amount diff_list right get diff_list i get minimum def
+                                    diff_list right remove_amount addput
+                                    diff_list i remove_amount neg addput
+                                } {
+                                    [(both sides off)] == die
+                                } ifelse
+                            } ifelse
+                            exit
+                        } loop
+                    } for
+
+                    % spread negative centers to positive neighbors
+                    % update ring_angles to match diff_list
+                    /ring_cursor start_angle def
+                    0 1 last_span { /i arg
+                        /current_span ring_spans i get def
+                        /ring_cursor diff_list i get adddef
+                        /ring_cursor current_span 1 get /angle_span get adddef
+                        current_span 0 get /ring_angle ring_cursor put
+                        /ring_cursor current_span 1 get /angle_span get adddef
+                    } for
+
+                } ifelse
+            } if
+        } if
+
+        /full_radius radius max_sub add def
+        Ring /wrapped known {
+            container /ring_angle container /angle get put
+            % pass parent_center_offset out
+            container /offset 
+                parent_center_offset parent_ring /radius get sub
+            put
+            % also set this ring's ring_angle:
+            % * make sure ring itself doesn't run into return line
+            % * also check that subrings don't run into return line
+            /container_angle container /ring_angle get def
+            /central_span
+                radius sibling_spacing add
+                parent_center_offset div
+                asin def
+            container_angle central_span sub 0 lt {
+                container /ring_angle central_span put
+            } if
+            container_angle central_span add 360 gt {
+                container /ring_angle 360 central_span sub put
+            } if
+            ring_components { /subring arg
+                /container_angle container /ring_angle get def
+                % distance to center of subring using law of cosines
+                % wrapper -a- wrapped -b- subring -c- wrapper
+                /a parent_center_offset def
+                /b subring /offset get radius add def
+                /gamma subring /ring_angle get def
+                /c
+                    a dup mul
+                    b dup mul add
+                    2 a mul b mul gamma cos mul sub
+                sqrt def
+                % angle to center with law of sins
+                /subring_angle gamma sin c div b mul asin def
+                % we want how subring_angle goes forward or back from wrapped
+                % negative if gamma is less than 180
+                % otherwise we want to negate and mymod it
+                gamma 180 lt {
+                    /subring_angle subring_angle neg def
+                } {
+                    /subring_angle subring_angle neg 360 mymod def
+                } ifelse
+
+                /subring_span subring /ring get /full_radius get sibling_hs add c div asin def
+                /overlap container_angle subring_angle add subring_span sub def
+                overlap 0 lt {
+                    /new_angle container_angle overlap sub def
+                    container /ring_angle get new_angle lt {
+                        container /ring_angle new_angle put
+                    } if
+                } if
+                /poke container_angle subring_angle add subring_span add def
+                /overlap poke 360 sub def
+                overlap 0 gt {
+                    /new_angle container_angle overlap sub def
+                    container /ring_angle get new_angle gt {
+                        container /ring_angle new_angle put
+                    } if
+                } if
+            } forall
+        } if
+
+        Ring /components components put
+        Ring /radius radius put
+        Ring /full_radius full_radius put
+} 0 /new dict_safe_func
+
+end     % now out of mystical_dict
+
+/mystical_get_spell {
+    mystical_dict begin
+    10 dict begin
+        /input_code arg
+        % determine type
+        /xflag false def
+        /input_code load xcheck {
+            /xflag true def
+            currentdict /input_code get cvlit /input_code arg
+        } if
+        /rtype xflag { /xarray} {input_code type cvlit } ifelse def
+        rtype /dicttype eq {
+            % convert dict into array of k, v, k, v, ...
+            /input_code [ input_code {} forall ] def
+        } if
+        % parse into Ring object
+        /Spell << /rtype rtype /root true >> def
+        Spell input_code handlecode
+        Spell
+    end
+    end
+} def
+
+/mystical_scale_spell { /Spell arg
+    Spell /full_radius get recip dup scale
+} def
+
+/mystical_draw_spell {
+    mystical_dict begin
+        /Spell arg
+        gsave
+            Spell mystical_scale_spell
+            Spell draw_ring
+        grestore
+    end
+} def
+
+/mystical {
+    10 dict begin
+        mystical_get_spell /Spell arg
+        Spell mystical_draw_spell
+    end
+} def
+
+/mystical_unscaled {
+    mystical_dict begin
+    10 dict begin
+        mystical_get_spell /Spell arg
+        Spell draw_ring
+    end
+    end
+} def
+
+/mystical_evoke { /evocation arg
+    evocation load mystical
+} def
+
+/mystical_evoke_unscaled { /evocation arg
+    evocation load mystical_unscaled
+} def
+
+/mystical_make_evocation_ligature { /Spell arg /evocation arg
+    % false token for label
+    <<
+        /name evocation /otype /nametype 
+        /xflag false /aflag true
+        /position 0 /angle -90 /parent <<
+            /radius Spell /full_radius get neg
+        >>
+        /ring Spell /ring_angle -90 /offset Spell /full_radius get
+        /defligature true
+    >> 
+} def
+/mystical_draw_evocation_label { /Spell arg /evocation arg
+    /ligature evocation Spell mystical_make_evocation_ligature def
+    mystical_dict begin
+        ligature draw_sigil
+        ligature draw_link
+    end
+} def
+
+/mystical_evoke_label_base { /do_scale arg /evocation arg
+    evocation load mystical_get_spell /Spell arg
+    gsave
+        do_scale { Spell mystical_scale_spell } if
+        evocation Spell mystical_draw_evocation_label
+    grestore
+} def
+
+/mystical_evoke_label { true mystical_evoke_label_base } def
+/mystical_evoke_label_unscaled { false mystical_evoke_label_base } def

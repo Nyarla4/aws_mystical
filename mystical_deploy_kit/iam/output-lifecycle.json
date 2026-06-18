@@ -1,0 +1,10 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-rendered-images",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "output/" },
+      "Expiration": { "Days": 1 }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+%!
+(sigils.ps) run
+
+/additions <<
+    /arg {
+        gsave
+            0.5 softscale
+            -1 -1 goto -0.25 1 goto -0.25 -1 goto nstroke
+            -0.25 0.5 0.5 90 -90 arcn
+            -0.625 0 goto nstroke
+            0.5 0 0.75 1 180 270 ell
+            0.5 0 0.5 1 270 360 ell
+            0.5 0 goto
+            nstroke
+            -0.25 0.25 1.25 0.75 90 0 elln nstroke
+        grestore
+    }
+    /cstroke {
+        sigil_bank /stroke get exec
+        0 0 0.125 60 180 sparc
+        0 0 0.125 180 -60 sparc
+        nstroke
+    }
+    /goto {
+        0 0 0.5 60 180 sparc
+        0 0 0.5 180 0 sparc
+        0 0 goto
+        nstroke
+        0 0 ndot
+    }
+    /rgoto { 0.5 60 polar /goto sigil_relative }
+    /dot {
+        gsave
+            2 recip softscale
+            0 0 1 -90 90 arc closepath nstroke
+            0 0 0.5 circle nstroke
+            -1 1 goto 0 1 goto nstroke
+        grestore
+    }
+    /softscale {
+        gsave
+            sigil_bank /scale get exec
+            6 recip softscale 0 1 translate
+            -1 1 0.5 spcircle nstroke
+            2 -2 translate
+            -1 0.5 goto 0 0.5 goto nstroke
+            -0.5 0 goto 0 0 goto nstroke
+        grestore
+    }
+    /nstroke {
+        sigil_bank /stroke get exec
+        gsave
+            4 recip softscale
+            -1 -1 goto
+            0 0.5 goto
+            0 -0.5 goto
+            1 1 goto
+            nstroke
+        grestore
+    }
+>> def
+
+additions {
+    mystical_dict begin
+        sigil_bank 3 1 roll put
+    end
+} forall

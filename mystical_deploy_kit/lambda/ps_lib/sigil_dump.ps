@@ -1,0 +1,71 @@
+%!
+(dmmlib/base.ps) run
+(dmmlib/lines.ps) run
+(dmmlib/polar.ps) run
+(dmmlib/textbase.ps) run
+(mystical.ps) run
+mystical_dict begin
+
+(dmmsigils.ps) run
+
+sigil_bank { cvlit /sigil_func arg /sigil_name arg
+    /function_name (sigil_) sigil_name 20 string cvs concatenate cvn def
+    function_name sigil_func cvx def
+} forall
+
+/sigil_RETURN {
+    gsave
+        90 rotate
+        sigil_bank /RETURN get exec
+    grestore
+    0 0.5 goto 0 1 goto nstroke
+    -0.25 0.75 goto 0.25 0.75 goto nstroke
+} def
+/sigil_COMPLETE {
+    gsave
+        90 rotate
+        sigil_bank /COMPLETE get exec
+    grestore
+    0 0.5 goto 0 1 goto nstroke
+} def
+
+%%EndProlog
+
+72 softscale 1.25 10 translate 
+/i 0 def
+/j 0 def
+[/sigil_setcolor /sigil_currentcolor 
+/sigil_setgray /sigil_currentgray
+/sigil_setdash /sigil_currentdash
+/sigil_setcmykcolor /sigil_currentcmykcolor
+/sigil_sethsbcolor /sigil_currenthsbcolor
+/sigil_setrgbcolor /sigil_currentrgbcolor
+/sigil_srand /sigil_rrand
+/sigil_setlinecap /sigil_currentlinecap
+/sigil_setlinewidth /sigil_currentlinewidth
+/sigil_setlinejoin /sigil_currentlinejoin
+/sigil_rand
+/sigil_setmiterlimit /sigil_currentmiterlimit
+/sigil_setmatrix /sigil_currentmatrix
+/sigil_setfont /sigil_currentfont
+/sigil_currentpoint /sigil_newpath
+]
+{
+    gsave
+        i 1.25 mul j -1.25 mul translate
+        /white false def
+        0.5 -0.125 0.125 {
+            neg dup dup neg dup box
+            % white { 0.95 grayfill } { 0.875 grayfill } ifelse
+            0.875 grayfill
+            newpath
+            /white white not def
+        } for
+        set_nib_matrix cvx exec
+    grestore
+    /i 1 adddef
+    i 6 ge {
+        /i 0 def
+        /j 1 adddef
+    } if
+} forall

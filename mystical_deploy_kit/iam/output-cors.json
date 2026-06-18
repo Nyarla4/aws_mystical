@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET"],
+    "AllowedOrigins": ["https://CLOUDFRONT_DOMAIN"],
+    "ExposeHeaders": [],
+    "MaxAgeSeconds": 3600
+  }
+]
