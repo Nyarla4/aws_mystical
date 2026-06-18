@@ -1,0 +1,721 @@
+%!
+
+/arg { exch def } def
+
+/sfd_debug { pop } def
+% /sfd_debug { == } def
+% define if not known
+/defaultdef {
+    % name definition
+    exch
+    % definition name
+    dup where {
+        % definition name dict
+        pop pop pop
+    } {
+        % definition name
+        exch def
+    } ifelse
+} def
+
+% += for postscript, two ways
+
+% add to a variable
+% v i -> v i v -> v i x -> v i+x -> -
+/adddef { 1 index cvx exec add def } def
+
+% add to a key in a dict or a position in an array
+% c k i -> c k i c -> c k i c k -> c k i x -> c k i+x -> -
+/addput { 2 index 2 index get add put } def
+
+/debug_var {
+    [ exch dup cvx exec ] ==
+} def
+
+/safe_func_dict_dict 20 dict defaultdef
+
+% /foo [/x /y /z] { x dup mul y dup mul z dup mul add add } 1 /new dict_safe_func
+% DSFs dictionary situation:
+%     Each function (by name) has its own func_local_dict
+%         (stored in /safe_func_dict_dict)
+%     The "function_dictionary" arg can be:
+%         a dictionary to use 
+%         /new to use a new dictionary for a new dictionary for each invocation
+%         false to not wrap the function in a dictionary at all
+%     This function_dictionary runs _inside_ of the func_local_dict.
+
+/dict_safe_func {
+    /function_dictionary arg
+    /returns arg
+    /function_body exch cvlit def
+    /arguments arg
+    /function_name arg
+
+    /func_local_dict <<
+        /arguments arguments 
+        /local_function_body function_body 
+        /function_dictionary function_dictionary 
+        /function_name function_name 
+        /returns returns 
+    >> def
+    safe_func_dict_dict function_name func_local_dict put
+
+    /standard_function_body {
+        % get data out of fake closure dictionary
+        safe_func_dict_dict exch get /func_local_dict arg
+        % start actual local dictionary, copy func_local_dict into it
+        10 dict begin
+        func_local_dict {
+            def
+        } forall
+        /func_local_dict currentdict def
+
+        % set a sentinel, roll above args
+        /function_name_s function_name 20 string cvs def
+        /f_name_len function_name_s length def
+        /sentinel 9 f_name_len add 10 add string def
+        sentinel 0 (sentinel:) putinterval
+        sentinel 9 function_name_s putinterval
+        0 1 9 {
+            9 add f_name_len add sentinel exch 32 put
+        } for
+        sentinel 9 f_name_len add 10 getinterval rand exch cvs pop
+        /sentinel sentinel cvn def
+        sentinel arguments length 1 add 1 roll
+        [countdictstack (>>> start) sentinel] sfd_debug
+        % enter dictionary
+        function_dictionary /new eq {
+            /function_dictionary 10 dict def
+        } if
+        function_dictionary false ne {
+            function_dictionary begin
+        } if
+        % define args
+        arguments length 1 sub -1 0 {
+            arguments exch get arg
+        } for
+        % run body
+        func_local_dict /local_function_body get cvx exec
+        % roll for returns
+        returns 1 add -1 roll
+        function_dictionary false ne {
+            % check dictionary
+            currentdict function_dictionary ne {
+                countdictstack ==
+                (wrong dictionary!) ==
+                die
+            } if
+            % leave dictionary
+            end
+        } if
+        % check sentinel
+        dup sentinel eq {
+            [countdictstack (<<< complete) sentinel] sfd_debug
+            pop
+        } {
+            1 0 0 setrgbcolor
+            doot
+            pstack
+            [countdictstack sentinel (not in place for) function_name] ==
+            die
+        } ifelse
+        currentdict func_local_dict ne {
+            countdictstack ==
+            (where is closure dictionary?!) ==
+            die
+        } if
+        end %func_local_dict
+        currentdict /func_local_dict undef
+    } def
+    func_local_dict /new_function_body [
+        function_name /standard_function_body cvx
+    ] put
+    func_local_dict /new_function_body get cvx function_name arg
+} def
+
+/safefunc { /new dict_safe_func } def
+/simplefunc { 0 /new dict_safe_func } def
+
+/circle { 0 360 arc closepath } def
+
+/dot { currentlinewidth 1.5 mul circle fill } def
+/doot { 0 0 dot } def
+
+/recip { 1 exch div } def
+/maximum { 2 copy gt { pop } { exch pop } ifelse } def
+/minimum { 2 copy lt { pop } { exch pop } ifelse } def
+/half { 2 div } def
+
+/PI 3.1415926 def
+
+/gcd_dict 3 dict def
+/gcd {
+    gcd_dict begin
+        /b arg /a arg
+        {
+            b a gt {
+                /b a /a b def def
+            } {
+                /r a b mod def
+                r 0 eq {
+                    exit
+                } {
+                    /a b /b r def def
+                } ifelse
+            } ifelse
+        } loop
+        b
+    end
+}  def
+
+% mod that accepts floats and makes negatives positive
+/mod_dict 2 dict def
+/mymod {
+    mod_dict begin
+        /modulus exch def
+        /original exch def
+        original 0 lt original modulus ge or {
+            original modulus div floor neg
+            modulus mul original add
+            /original exch def
+        } if
+        original
+    end
+} def
+
+/interpolate { 4 dict begin /range arg /point arg
+    point 0 ge {
+        point range length 1 sub lt {
+            /p point cvi def
+            /adjust point p sub def
+            % return range[p] + adjust * (range[p+1] - range[p])
+            range p get dup range p 1 add get exch sub adjust mul add
+        } {
+            range range length 1 sub get
+        } ifelse
+    }{
+        range 0 get
+    } ifelse
+    end
+} def
+
+/randint [/range] {rand range cvi mod} 1 safefunc
+
+/randrange [/min /max /resolution] {
+    max min sub resolution mul randint resolution div min add
+} 1 safefunc
+
+% curve analysis
+/lcurveto_dict 8 dict def
+/lcurveto {
+    lcurveto_dict begin
+        /y3 arg /x3 arg
+        /y2 arg /x2 arg
+        /y1 arg /x1 arg
+        x1 y1 lineto x2 y2 lineto x3 y3 lineto
+    end
+} def
+/pcurveto {
+    lcurveto_dict begin
+        /y3 arg /x3 arg
+        /y2 arg /x2 arg
+        /y1 arg /x1 arg
+        currentpoint /y0 arg /x0 arg
+        gsave
+            1 0 0 setrgbcolor
+            newpath
+            x0 y0 dot
+            x1 y1 dot
+            x2 y2 dot
+            x3 y3 dot
+        grestore
+        x1 y1 x2 y2 x3 y3 curveto
+    end
+} def
+
+% r is radius of near circle (centered on origin)
+% q is radius of far circle (centered on d,0)
+% d is distance between centers
+% returns angle of intersection from origin
+/circle_intersection { 5 dict begin /d arg /q arg /r arg
+    r dup mul d dup mul add q dup mul sub d 2 mul div
+    /x exch def
+    x r div dup dup mul 1 exch sub sqrt exch atan
+    /a exch def
+    a
+end } def
+
+/distance {
+    /by arg /bx arg /ay arg /ax arg
+    ax bx sub dup mul ay by sub dup mul add sqrt
+} def
+
+/angle4 {
+    /by arg /bx arg /ay arg /ax arg
+    by ay sub bx ax sub atan
+} def
+
+% ellipse library
+/ellipsedict 20 dict def
+ellipsedict /mtrx matrix put
+ellipsedict begin
+    /ell_base {
+        /arc_command arg
+        /endangle arg /startangle arg
+        /yrad arg /xrad arg
+        /y arg /x arg
+        /savematrix mtrx currentmatrix def
+        x y translate
+        xrad yrad scale
+        0 0 1 startangle endangle arc_command cvx exec
+        savematrix setmatrix
+    } def
+end
+/ell { ellipsedict begin /arc ell_base end } def
+/elln { ellipsedict begin /arcn ell_base end } def
+/spell { ellipsedict begin /sparc ell_base end } def
+/spelln { ellipsedict begin /sparcn ell_base end } def
+
+% svg-style arc
+% svgarc: draw elliptical arc with SVG-style arguments
+% xrad yrad xrot large sweep nx ny
+% start point at currentpoint, end point at nx,ny
+% radii of ellipse is xrad, yrad
+% angle of ellipse x-axis is xrot
+% arc counterclockwise if sweep is 1, else clockwise
+% large arc if large is 1
+
+% rsvgarc: nx/ny is relative
+% svgsparc: use spline arcs, two if large
+% rsvgsparc: both of above
+% dsvgarc: debug, show origin
+
+ellipsedict begin
+    /svgarc_base 
+    [/xrad /yrad /xrot /large /sweep /nx /ny /relative /spline /debug] {
+
+        % save current ref frame
+        /originalmatrix matrix currentmatrix def
+
+        % spare matrix for transformations
+        /tempmatrix matrix def
+
+        /ntrans {
+            % copy of tempmatrix is already on stack
+            pop
+            % nx and ny need to be where they'll be in the new situation
+            nx ny tempmatrix itransform /ny arg /nx arg
+            tempmatrix concat
+        } def
+
+        %move to origin
+        relative {
+            currentpoint translate
+        } {
+            currentpoint tempmatrix translate
+            ntrans
+        } ifelse
+
+        %rotate ellipse
+        xrot tempmatrix rotate
+        ntrans
+
+        % scale ellipse to circle
+        xrad yrad tempmatrix scale
+        /r 1 def
+        ntrans
+
+        % rotate nx/ny to 0/positive
+        nx neg ny atan tempmatrix rotate
+        ntrans
+
+        % at this point, origin is at currentpoint, nx is 0, ny > 0, r=1
+
+        % if ny > 2, change r to half of ny (based on W3 SVG spec F.6.2)
+        ny 2 gt {
+            /r ny 2 div def
+        } if
+
+        % compute and draw the arc
+        /l ny 2 div def
+        /s r dup mul l dup mul sub sqrt def 
+        /a l s atan def 
+        sweep 0 gt large 0 gt xor {
+            -1 1 scale
+        } if
+        large 0 gt {
+            spline {
+                s neg l r a neg 180 sparcn
+                s neg l r 180 a sparcn
+            } {
+                s neg l r a neg a arcn
+            } ifelse
+        } { 
+            spline {
+                s neg l r a neg a sparc
+            } {
+                s neg l r a neg a arc
+            } ifelse
+        } ifelse
+        debug { gsave currentpoint newpath goto s neg l goto stroke grestore } if
+
+        % return to original ref frame
+        originalmatrix setmatrix
+    } 0 ellipsedict dict_safe_func
+end
+
+/svgarc {ellipsedict begin false false false svgarc_base end} def
+/rsvgarc {ellipsedict begin true false false svgarc_base end} def
+/svgsparc {ellipsedict begin false true false svgarc_base end} def
+/rsvgsparc {ellipsedict begin true true false svgarc_base end} def
+/dsvgarc {ellipsedict begin false false true svgarc_base end} def
+
+
+/softscale {
+    dup dup scale
+    1 exch div thicken
+} def
+
+/thicken {
+    currentlinewidth mul setlinewidth
+} def
+
+/box {
+    % lbrt
+    4 copy 3 -1 roll exch 3 1 roll 6 2 roll
+    % lb rb rt lt
+    moveto lineto lineto lineto closepath
+} def
+
+/square {       % like circle but square
+    3 dict begin
+        /r arg
+        /y arg
+        /x arg
+        x r sub y r sub x r add y r add box
+    end
+} def
+
+/roundboxdict 5 dict def
+%box with rounded corners
+/roundbox {
+    %lbrt corner_radius
+    roundboxdict begin
+        /c arg
+        /t exch c sub def 
+        /r exch c sub def
+        /b exch c add def
+        /l exch c add def
+        r t c 0 90 arc
+        l t c 90 180 arc
+        l b c 180 270 arc
+        r b c 270 360 arc
+        closepath
+    end
+} def
+
+/curr_path {
+    false
+    gsave
+        {2 {pop} repeat pop true}
+        {2 {pop} repeat pop true}
+        {6 {pop} repeat pop true}
+        {0 {pop} repeat pop true}
+        pathforall
+    grestore
+} def
+
+/goto {
+    curr_path {lineto} {moveto} ifelse
+} def
+/rgoto { rlineto } def
+
+/centershowdict 4 dict def
+/centershow {
+    centershowdict begin
+        gsave
+            0 0 moveto
+            dup true charpath pathbbox
+            /top exch def
+            /right exch def
+            /bottom exch def
+            /left exch def
+        grestore
+        gsave
+            left right add 2 div neg
+            top bottom add 2 div neg
+            moveto show
+        grestore
+    end
+} def
+
+% use anonymous dictionary in case function contains circrepeat
+/schlafrepeat {
+    3 dict begin
+    /cr_function arg
+    /cr_x arg
+    /cr_n arg
+    cr_n abs {
+        cr_function
+        360 cr_n div cr_x mul rotate
+    } repeat
+    end
+} def
+/circrepeat { 1 exch schlafrepeat } def
+
+% takes a proc, runs it on both sides
+/hmirror {
+    2 dict begin
+        /lr_function arg
+        -1 2 1 {
+            gsave
+                1 scale
+                lr_function
+            grestore
+        } for
+    end
+} def
+
+/vmirror {
+    2 dict begin
+        /tb_function arg
+        -1 2 1 {
+            gsave
+                1 exch scale
+                tb_function
+            grestore
+        } for
+    end
+} def
+
+/grayfill { gsave setgray fill grestore } def
+/rgbfill { gsave setrgbcolor fill grestore } def
+/hsbfill { gsave sethsbcolor fill grestore } def
+/whitefill { 1 grayfill } def
+
+% "sinebow" based on http://basecase.org/env/on-rainbows by Charlie Loyd
+/sinebow {
+    2 div
+    dup cos dup mul exch
+    dup 120 add cos dup mul exch
+    120 sub cos dup mul
+} def
+
+/setsinebowcolor { sinebow setrgbcolor } def
+/sinebowfill { gsave setsinebowcolor fill grestore } def
+
+% "katebow" colors based on "The 12-bit rainbow palette" by Kate Rose Morley
+% https://iamkate.com/data/12-bit-rainbow/
+
+/katebow_dict 10 dict def
+katebow_dict begin
+    /katebow_colors [
+        [10 12 14 14  9  4  2  0  0  3 6 8 10]
+        [ 3  6  9 13 13 13 12 11  9  6 3 1  3]
+        [ 5  6  4  0  5  8 11 12 12 11 9 7  5]
+    ] def
+end
+
+/katebow { /angle arg
+    katebow_dict begin
+        /k_index angle 360 mymod 30 div def
+        0 1 2 {
+            katebow_colors exch get k_index exch interpolate 15 div
+        } for
+    end
+} def
+/setkatebowcolor { katebow setrgbcolor } def
+/katebowfill { katebow rgbfill } def
+
+% take (#db0072) or (db0072), put r g b on the stack
+% so you can say `(#db0072) hextorgb setrgbcolor` or similar
+/hextorgb { /hexcolor arg
+    hexcolor 0 get (#) 0 get eq {
+        /hexcolor hexcolor 1 hexcolor length 1 sub getinterval def
+    } if
+    /colorlen hexcolor length 3 idiv def
+    /result [0 0 0] def
+    /buffer colorlen 3 add string def
+    buffer 0 (16#) putinterval
+    0 1 2 { /i arg
+        hexcolor i colorlen mul colorlen getinterval
+        buffer exch 3 exch putinterval
+        result i buffer cvi put
+    } for
+    /divisor 16 colorlen exp 1 sub def
+    0 1 2 { /i arg
+        result i get divisor div
+    } for
+} def
+
+/sethexcolor { hextorgb setrgbcolor } def
+/hexfill { hextorgb rgbfill } def
+
+% render an eps file, given filename and bounding box, 
+% with ll at 0,0 and height of 1
+/epsdict 10 dict def
+/include_eps {
+    epsdict begin
+        /t arg
+        /r arg
+        /b arg
+        /l arg
+        /file arg
+        % code from eps spec
+        /b4_Inc_state save def          % Save state for cleanup
+        /dict_count countdictstack def  % Count objects on dict stack
+        /op_count count 1 sub def       % Count objects on operand stack
+        userdict begin                  % Push userdict on dict stack
+        /showpage { } def               % Redefine showpage, { } = null proc
+        0 setgray 0 setlinecap          % Prepare graphics state
+        1 setlinewidth 0 setlinejoin
+        10 setmiterlimit [ ] 0 setdash newpath
+        /languagelevel where            % If level not equal to 1 then
+        {
+            pop languagelevel           % set strokeadjust and
+            1 ne                        % overprint to their defaults.
+            {
+                false setstrokeadjust false setoverprint
+            } if
+        } if
+
+        1 t b sub div dup scale
+        l neg b neg translate
+
+        l b r t box clip newpath
+
+        file run
+
+        count op_count sub {pop} repeat
+        countdictstack dict_count sub {end} repeat
+        b4_Inc_state restore
+    end
+} def
+
+/shavedict 10 dict def
+/shavepath {
+    shavedict begin
+    % important vars: oldx oldy startx starty
+        [
+            {
+                /y arg /x arg
+                /startx x def /starty y def
+                /oldx x def /oldy y def
+                x y 
+                /moveto cvx
+            }
+            {
+                /y arg /x arg
+                oldx x sub dup mul oldy y sub dup mul add sqrt
+                currentlinewidth 0.1 mul gt {
+                    % line is not too short to ignore
+                    /oldx x def /oldy y def
+                    x y
+                    /lineto cvx
+                } if
+            }
+            {
+                /y3 arg /x3 arg
+                /y2 arg /x2 arg
+                /y1 arg /x1 arg
+                oldx x1 sub dup mul oldy y1 sub dup mul add sqrt
+                x1 x2 sub dup mul y1 y2 sub dup mul add sqrt
+                x2 x3 sub dup mul y2 y3 sub dup mul add sqrt
+                add add
+                currentlinewidth 0.1 mul gt {
+                    % curve is not too short to ignore
+                    /oldx x3 def /oldy y3 def
+                    x1 y1 x2 y2 x3 y3
+                    /curveto cvx
+                } if
+            }
+            {
+                oldx startx sub dup mul oldy starty sub dup mul add sqrt
+                currentlinewidth 0.1 mul le {
+                    % closepath is too short - might cause trouble
+                    % change end of last segment to exactly start point
+                    % top of stack is either x y curveto or x y lineto
+                    3 1 roll
+                    pop pop startx starty 
+                    3 -1 roll
+                } if
+                /oldx startx def /oldy starty def
+                /closepath cvx
+            }
+            pathforall
+        ] 
+        newpath
+        cvx exec
+    end
+} def
+
+% colors
+% divide distance from white/black by x
+
+/lighten {
+    currentrgbcolor
+    3 {
+        4 -1 roll
+        dup
+        5 1 roll
+        exch 1 exch sub exch div 1 exch sub
+        3 1 roll
+    } repeat
+    setrgbcolor
+    pop
+} def
+/darken {
+    currentrgbcolor
+    3 {
+        4 -1 roll
+        dup
+        5 1 roll
+        div
+        3 1 roll
+    } repeat
+    setrgbcolor
+    pop
+} def
+
+
+% multiply distance from white/black by x
+/mul_lighten {
+    currentrgbcolor
+    3 {
+        4 -1 roll
+        dup
+        5 1 roll
+        exch 1 exch sub exch mul 1 exch sub
+        3 1 roll
+    } repeat
+    setrgbcolor
+    pop
+} def
+/mul_darken {
+    currentrgbcolor
+    3 {
+        4 -1 roll
+        dup
+        5 1 roll
+        mul
+        3 1 roll
+    } repeat
+    setrgbcolor
+    pop
+} def
+
+% grid of dots in box given 
+/dotgrid {
+    /gridspacing arg
+    /gridtop arg
+    /gridright arg
+    /gridbottom arg
+    /gridleft arg
+    gridleft gridspacing gridright {
+        /gridx arg
+        gridbottom gridspacing gridtop {
+            /gridy arg
+            gridx gridy dot
+        } for
+    } for
+} def

@@ -1,0 +1,210 @@
+%!
+(dmmlib/base.ps) run
+(dmmlib/textbase.ps) run
+
+/objfilldict 10 dict def
+/ObjectFill {
+    objfilldict begin
+        /object arg
+        /y_separation arg
+        /x_separation arg
+
+        gsave pathbbox grestore
+        /top arg
+        /right arg
+        /bottom arg
+        /left arg
+        /x_start left x_separation div floor def
+        /x_end right x_separation div ceiling def
+
+        /y_start bottom y_separation div floor def
+        /y_end top y_separation div ceiling def
+        
+        y_start 1 y_end {
+            /j arg
+            x_start 1 x_end {
+                /i arg
+                /x_attempt i x_separation mul def
+                /y_attempt j y_separation mul def
+                x_attempt y_attempt infill {
+                    gsave
+                        newpath
+                        x_attempt y_attempt translate
+                        object
+                    grestore
+                } if
+            } for
+        } for
+    end
+} def
+
+/FractalFill {
+    10 dict begin
+        /object arg
+        /maxdepth arg
+        /y_separation arg
+        /x_separation arg
+        
+        gsave pathbbox grestore
+        /top arg
+        /right arg
+        /bottom arg
+        /left arg
+        /x_start left x_separation div floor def
+        /x_end right x_separation div ceiling def
+
+        /y_start bottom y_separation div floor def
+        /y_end top y_separation div ceiling def
+
+        /step_transform {
+            /y_step arg
+            /x_step arg
+            x_step x_separation mul
+            y_step y_separation mul
+        } def
+
+        /make_key {
+            /key_j arg
+            /key_i arg
+            key_i cvi 6 string cvs  
+            ( ) concatenate 
+            key_j cvi 6 string cvs concatenate
+        } def
+
+        /break_key {
+            15 string cvs /key arg
+            key token pop /key_i arg
+            token pop /key_j arg
+            pop
+            key_i key_j
+        } def
+
+        /points 10 dict def
+
+        y_start 1 y_end {
+            /j arg
+            x_start 1 x_end {
+                /i arg
+                i j step_transform infill {
+                    points 
+                    i j make_key true put
+                } if
+            } for
+        } for
+
+        newpath
+
+        gsave
+            {
+                maxdepth 0 le {
+                    exit
+                } if
+                /biggerpoints 10 dict def
+                /big_x_start x_start 2 div floor def
+                /big_x_end x_end 2 div ceiling def
+                /big_y_start y_start 2 div floor def
+                /big_y_end y_end 2 div ceiling def
+
+                % look for larger groups
+
+                /offsets 4 array def
+                0 1 3 {
+                    /i arg
+                    offsets i [ i 2 mod i 2 idiv ] put
+                } for
+
+
+                maxdepth 1 gt {
+                    big_y_start 1 big_y_end {
+                        /big_j arg
+                        big_x_start 1 big_x_end {
+                            /big_i arg
+                            /success true def
+                            offsets {
+                                aload pop 
+                                /j_offset arg
+                                /i_offset arg
+
+                                % check each of 4 points
+                                points 
+                                big_i 2 mul i_offset add 
+                                big_j 2 mul j_offset add
+                                make_key
+                                known not {
+                                    /success false def
+                                } if
+                            } forall
+
+                            success {
+                                biggerpoints big_i big_j make_key true put
+                                % remove from points
+                                offsets {
+                                    aload pop
+                                    /j_offset arg
+                                    /i_offset arg
+                                    points 
+                                    big_i 2 mul i_offset add
+                                    big_j 2 mul j_offset add
+                                    make_key
+                                    undef
+                                } forall
+                            } if
+                            
+                        } for
+
+                    } for
+                } if
+
+                points {
+                    {
+                        gsave
+                            break_key step_transform translate object 
+                        grestore
+                    }
+                    {
+                        pop 
+                    } ifelse
+                } forall
+                0.5 x_separation mul 0.5 y_separation mul translate
+                2 softscale
+
+                /points biggerpoints def
+                /x_start big_x_start def
+                /x_end big_x_end def
+                /y_start big_y_start def
+                /y_end big_y_end def
+
+                /maxdepth maxdepth 1 sub def
+            } loop
+        grestore
+    end
+} def
+
+/pathsize {
+    gsave
+        flattenpath pathbbox 3 -1 roll sub 3 1 roll exch sub maximum
+    grestore
+} def
+
+/radial_gradient_fill {
+    /gradient_steps arg
+    /blue arg
+    /green arg
+    /red arg
+    whitefill
+    gsave
+        clip
+        1 setlinejoin
+        pathsize 0.5 mul setlinewidth
+        1 gradient_steps recip dup neg exch {
+            /i arg
+            gsave
+                i thicken
+                red green blue setrgbcolor 1 i sub mul_lighten
+                stroke
+            grestore
+        } for
+    grestore
+} def
+
+/gradientfill { radial_gradient_fill } def

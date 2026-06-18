@@ -1,0 +1,18 @@
+PostScript Hacks
+
+I write a lot of PostScript code.  Sometimes I write some code that is
+impressive enought that I want to share it as code.
+
+As of Jun 2015 <a href="https://github.com/denismm/dmmlib">my postscript libraries are available on github</a>.
+
+<ul>
+    <li><a href="../readpnm/readpnm.html">readpnm: Read netpbm images directly from PostScript</a></li>
+    <li><a href="../lines/lines.html">lines: Alternate line styles in PostScript</a></li>
+    <li><a href="../postscript/documentation/hexasomething.html">hexasomething: an example of dmmlib and how I code.</a></li>
+    <li><a href="../postscript/documentation/all_rainbows.html">all_rainbows: comparing the rainbow algorithms included in dmmlib.</a></li>
+</ul>
+
+<hr>
+<address>
+Last modified 2023-01-30 by <a href="/~dmm/">Denis Moskowitz</a>.
+</address>
