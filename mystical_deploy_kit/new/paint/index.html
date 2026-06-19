@@ -15,13 +15,11 @@
 <body class="bg-dark bg-gradient">
     <div class="container">
         <aside class="sidebar">
-            <!-- 기본 드로잉 툴 -->
             <button class="tool-btn btn btn-light w-100 mb-2 active" data-tool="brush" title="브러시">🖌️</button>
             <button class="tool-btn btn btn-outline-light w-100 mb-2" data-tool="line" title="직선">╱</button>
 
             <hr class="border-secondary my-2"/>
 
-            <!-- Mystical 링 툴 -->
             <span class="sidebar-label">Mystical</span>
             <button class="tool-btn btn btn-outline-light w-100 mb-2" data-tool="xarray" title="Executable Array { }">{ }</button>
             <button class="tool-btn btn btn-outline-light w-100 mb-2" data-tool="array"  title="Array [ ]">[ ]</button>
@@ -29,7 +27,6 @@
 
             <hr class="border-secondary my-2"/>
 
-            <!-- 액션 버튼 -->
             <button id="save-btn"  class="btn btn-outline-light w-100 mb-2" title="PNG로 저장">💾</button>
             <button id="clear-btn" class="btn btn-outline-light w-100"      title="전체 지우기">🗑️</button>
         </aside>
@@ -44,9 +41,7 @@
             </div>
         </main>
 
-        <!-- ── 결과 패널 ── -->
         <aside class="result-panel">
-            <!-- 모드 선택 -->
             <div class="result-section">
                 <label class="result-label" for="render-mode">렌더 모드</label>
                 <select id="render-mode" class="render-select">
@@ -55,22 +50,43 @@
                 </select>
             </div>
 
-            <!-- PS 코드 출력 -->
             <div class="result-section">
                 <span class="result-label">PostScript 코드</span>
                 <pre id="ps-output" class="ps-output">(기호를 그려보세요)</pre>
             </div>
 
-            <!-- 렌더링 결과 -->
             <div class="result-section">
                 <span class="result-label">렌더링 결과</span>
                 <span id="render-status" class="render-status">대기 중</span>
                 <img id="render-img" class="render-img" alt="렌더링 결과" style="display:none"/>
             </div>
         </aside>
+
+        <aside class="debug-panel border-start border-secondary ps-3 ms-3 text-light">
+            <div class="result-section">
+                <span class="result-label text-warning">🛠️ 디버그 콘솔</span>
+                
+                <div class="mb-3">
+                    <label class="text-muted small d-block mb-1">순수 이미지 기반 역산</label>
+                    <button id="ocr-run-btn" class="btn btn-sm btn-outline-warning w-100">로컬 OCR 프로세스 구동</button>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="debug-upload" class="text-muted small d-block mb-1">테스트 이미지 업로드</label>
+                    <input type="file" id="debug-upload" class="form-control form-control-sm bg-dark text-light border-secondary" accept="image/*" />
+                </div>
+
+                <div>
+                    <label class="text-muted small d-block mb-1">디버그 출력</label>
+                    <pre id="debug-console" class="bg-black text-success p-2 rounded small" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;">(로그 대기 중...)</pre>
+                </div>
+            </div>
+        </aside>
     </div>
+
     <script>const LAMBDA_URL = "https://pnn0m9j6w7.execute-api.ap-northeast-2.amazonaws.com/render";</script>
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
