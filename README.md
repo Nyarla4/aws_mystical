@@ -1,44 +1,24 @@
 # aws_mystical
 
-YOLOv8 Nano 기반의 ONNX 모델을 활용하여 브라우저 환경에서 실시간으로 마법진 기호를 탐지하고, 분석된 기호 시퀀스를 PostScript 코드로 매핑하여 AWS Lambda 백엔드에서 해석 및 실행하는 융합 아키텍처 프로젝트입니다.
+- YOLOv8 기반의 ONNX<sup>[1](#footnote_1)</sup> 모델 활용
+- 브라우저 환경에서 실시간으로 Mystical 언어<sup>[2](#footnote_2)</sup> 탐지
+- 분석된 기호 시퀀스를 PostScript 코드<sup>[3](#footnote_3)</sup>로 매핑
+- AWS Lambda<sup>[4](#footnote_4)</sup> 백엔드에서 해석 및 실행
 
 ## 주요 기능
-- 실시간 기호 탐지: 웹 브라우저 Canvas2D 환경에서 ONNX Runtime 기술을 이용하여 사용자 드로잉 실시간 추론
-- 인덱싱 및 NMS 후처리: 모델이 출력하는 바운딩 박스와 클래스 신뢰도 점수를 분석하고, IoU(Intersection over Union) 연산 기반의 비최대 억제(Non-Maximum Suppression) 알고리즘을 거쳐 정확한 기호 좌표 추출
+- 실시간 기호 탐지: 웹 브라우저 Canvas2D 환경에서 ONNX Runtime<sup>[5](#footnote_5)</sup> 기술을 이용하여 사용자 드로잉 실시간 추론
 - PostScript 백엔드 연동: 추출된 기호 체계를 PostScript(PS) 스트림 구조로 해석하여 AWS 서버리스 아키텍처 내에서 컴파일 및 결과 반환
 
-## 프로젝트 구조
-```
-aws_mystical/
-├── mystical_deploy_kit/     # AWS 배포 자산 킷
-│   └── iam/
-│   │   └── policy 및 cors 등 json
-│   └── lambda/
-│   │   └── ps_lib/
-│   │   │   └── dmmlib/      # 리눅스 환경 호환 구조의 PostScript 코어 라이브러리 엔티티
-│   │   └── handler.py
-│   └── new/
-│   │   └── paint/
-│   │       └── app.js       # 웹 화면 Canvas 렌더링, 이벤트 핸들링 및 디버그 콘솔 제어
-│   │       └── ai.js        # ONNX 모델 로드, 전처리 데이터 생성 및 NMS 알고리즘 구현
-│   │       └── best.onnx
-│   │       └── index.html
-│   │       └── reset.css
-│   │       └── styles.css
-│   └── deploy.sh
-│   └── ghostscript-arm64.zip
-│   └── lambda_package.zip
-└── .gitignore               # 형상 관리 제외 대상 정의 파일
-```
-## 개발 환경 구성 및 저장소 관리 규칙
-
-### 1. 파일 시스템 호환성 주의사항 (dmmlib)
-`mystical_deploy_kit/lambda/ps_lib/dmmlib/` 디렉토리 내부는 AWS Lambda(Linux) 환경 구동에 맞추어 구성되어 있으므로, 리눅스 전용 파일 속성 및 특수 링크를 포함하고 있습니다. Windows 네이티브 환경(PowerShell 등)에서 해당 경로의 인덱싱을 시도할 경우 파일 시스템 레이어 경계 불일치로 인한 오류(Function not implemented)가 발생합니다.
-
-따라서 파일의 무결성과 형상 관리를 유지하기 위해, 소스 코드 수정 후 원격 저장소 푸시 작업은 반드시 **WSL(Linux) 터미널** 환경에서 수행해야 합니다.
-
-
------------------------------
-aws
+<!-- aws
     CloudWatch > 로그 관리 > 로그 그룹: 람다가 잔존하며 추가적인 지속적 비용 청구가 될 수 있음
-    API Gateway > 리소스
+    API Gateway > 리소스 -->
+
+<a name="footnote_1">1</a>: Open Neural Network Exchange. 다른 DNN 프레임워크 환경(ex Tensorflow, PyTorch, etc..)에서 만들어진 모델들을 서로 호환되게 사용할 수 있도록 만들어진 공유 플랫폼
+
+<a name="footnote_2">2</a>: PostScript를 원형 띠, 기호, 일부 텍스트로 표현한 작성 방식
+
+<a name="footnote_3">3</a>: PDL(페이지 기술 언어), 디지털 문서를 고품질 벡터 그래픽과 텍스트로 변환하여 출력하는 스택 기반의 프로그래밍 언어.
+
+<a name="footnote_4">4</a>: 아마존 웹 서비스(AWS)가 제공하는 이벤트 기반의 서버리스 컴퓨팅 서비스로, 인프라(서버) 관리 없이 코드만 업로드하여 필요할 때마다 실행하는 함수 단위의 연산 플랫폼.
+
+<a name="footnote_5">5</a>: 크로스 플랫폼 추론 및 학습 머신러닝 가속기
