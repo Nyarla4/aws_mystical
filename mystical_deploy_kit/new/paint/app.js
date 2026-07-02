@@ -100,13 +100,13 @@ function drawXarray(cx, cy, r) {
     const graphR = innerR * 0.92;
 
     // mystical.ps 107~122줄: 슐레플리 별다각형({p/q}) 산출
-    let starPoints, starStep, starRings;
+    let starPoints, starStep, starRings, fullStep;
     if (compN <= 2) {
         starPoints = 5;
         starStep   = 2;
         starRings  = 1;
     } else {
-        const fullStep = Math.floor((compN * 2) / 5);
+        fullStep = Math.floor((compN * 2) / 5);
         starRings  = gcd(compN, fullStep);
         starPoints = compN / starRings;
         starStep   = fullStep / starRings;
@@ -117,7 +117,7 @@ function drawXarray(cx, cy, r) {
         const ringOffset = (ringIdx * 2 * Math.PI) / compN;
         const pts = [];
         for (let i = 0; i < starPoints; i++) {
-            const a = ringOffset + (i * starStep * 2 * Math.PI) / compN - Math.PI / 2;
+            const a = ringOffset + (i * fullStep * 2 * Math.PI) / compN - Math.PI / 2;
             pts.push({ x: cx + graphR * Math.cos(a), y: cy + graphR * Math.sin(a) });
         }
         ctx.beginPath();
