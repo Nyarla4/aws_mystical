@@ -1,2 +1,0 @@
-#!/usr/bin/perl
-system "pstopng -1.1 d d d 50 examples.ps " . join (" ", @ARGV);
