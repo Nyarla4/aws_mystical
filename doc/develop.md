@@ -35,3 +35,10 @@ aws_mystical/
 ![dataset](./dataset.png)
 ### 학습 진행
 ![yolo](./yolo.png)
+
+## 보안 처리 기록
+
+1. 초기 commit 시에 aws 액세스 키 ignore가 누락되어 함께 커밋 되었음(추후 제거 및 ignore 처리)
+2. repo를 public으로 돌리고 해당 내용이 history에서 접속가능하여 github 및 aws에서 보안관련 메일 수신
+3. 유출 액세스 키를 전부 삭제 후 해당 액세스 키를 가진 IAM 사용자에서 V3 권한 삭제 처리
+4. 현재 액세스 키를 신규 발급받음
