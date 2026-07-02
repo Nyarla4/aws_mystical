@@ -16,7 +16,7 @@
 
 <a name="footnote_1f" href="#footnote_1">1</a>: Open Neural Network Exchange. 다른 DNN 프레임워크 환경(ex Tensorflow, PyTorch, etc..)에서 만들어진 모델들을 서로 호환되게 사용할 수 있도록 만들어진 공유 플랫폼
 
-<a name="footnote_2f" href="#footnote_2">2</a>: PostScript를 원형 띠, 기호, 일부 텍스트로 표현한 작성 방식
+<a name="footnote_2f" href="#footnote_2">2</a>: PostScript를 원형 띠, 기호, 일부 텍스트로 표현한 작성 방식. Denis M. Moskowitz가 만든 언어([denismm/mystical_ps](https://github.com/denismm/mystical_ps), MIT License)이며, 본 프로젝트는 해당 PostScript 엔진(`ps_lib/`)을 원본 그대로 포함해 사용합니다.
 ![mystical_example](./doc/mystical_example.png)
 
 <a name="footnote_3f" href="#footnote_3">3</a>: PDL(페이지 기술 언어), 디지털 문서를 고품질 벡터 그래픽과 텍스트로 변환하여 출력하는 스택 기반의 프로그래밍 언어.
