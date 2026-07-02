@@ -4,6 +4,7 @@
 - 브라우저 환경에서 실시간으로 Mystical 언어<sup>[2](#footnote_2)</sup> 탐지
 - 분석된 기호 시퀀스를 PostScript 코드<sup>[3](#footnote_3)</sup>로 매핑
 - AWS Lambda<sup>[4](#footnote_4)</sup> 백엔드에서 해석 및 실행
+- AWS cloud front로 배포 진행(https://dcd3zthwdsd4j.cloudfront.net/)
 
 ## 주요 기능
 - 실시간 기호 탐지: 웹 브라우저 Canvas2D 환경에서 ONNX Runtime<sup>[5](#footnote_5)</sup> 기술을 이용하여 사용자 드로잉 실시간 추론
