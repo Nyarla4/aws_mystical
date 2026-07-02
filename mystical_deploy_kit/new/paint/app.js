@@ -56,9 +56,25 @@ document.querySelector(".sidebar").addEventListener("click", (e) => {
     if (btn) setActiveTool(btn.dataset.tool);
 });
 
+// ── 유클리드 호제법 (mystical.ps의 gcd 연산자 대응) ────────────────────────────
+function gcd(a, b) {
+    a = Math.abs(Math.round(a));
+    b = Math.abs(Math.round(b));
+    while (b) {
+        [a, b] = [b, a % b];
+    }
+    return a || 1;
+}
+
 // ── xarray { } ───────────────────────────────────────────────────────────────
+// mystical.ps의 draw_ring 로직(103~123줄)을 캔버스 미리보기용으로 근사 이식.
+// 원본은 comp_n(= components length, {} 안 기호 개수)이 star 각 수를 결정하고,
+// radius는 comp_n의 "결과"(circumference/2π)일 뿐 원인이 아니다.
+// 하지만 드래그 중에는 아직 기호가 그려지지 않아 comp_n을 알 수 없으므로,
+// 원본의 radius 산출식(circumference = 0.5 + Σwidth + 0.5, radius = circumference/2π)을
+// 역으로 풀어 comp_n을 근사 추정한다 (모든 기호를 std_sigil_width로 가정).
 function drawXarray(cx, cy, r) {
-    if (r <= GAP + 10) return; 
+    if (r <= GAP + 10) return;
     const innerR = r - GAP;
 
     ctx.beginPath();
@@ -69,20 +85,45 @@ function drawXarray(cx, cy, r) {
     ctx.arc(cx, cy, innerR, 0, 2 * Math.PI);
     ctx.stroke();
 
-    const n      = 9;
+    // mystical.ps 상수: ring_width = 1(PS 단위) ↔ 캔버스 GAP(px)로 매핑
+    const STD_SIGIL_WIDTH = 1.25;                 // mystical.ps /std_sigil_width
+    const SIGIL_WIDTH_PX  = GAP * STD_SIGIL_WIDTH; // 기호 1개당 예상 폭(px)
+    const BASE_OFFSET_PX  = GAP * 1;               // ps의 시작/종료 여백(0.5 + 0.5 = 1)
+
+    // circumference = 2π × radius (mystical.ps 538줄의 역관계)
+    const circumferencePx = 2 * Math.PI * innerR;
+
+    // comp_n 근사 역산 (mystical.ps 480~538줄 로직의 역함수, 균일폭 가정)
+    let compN = Math.round((circumferencePx - BASE_OFFSET_PX) / SIGIL_WIDTH_PX);
+    compN = Math.max(compN, 5); // 최소 5각 고정 (comp_n ≤ 2 케이스 대응)
+
     const graphR = innerR * 0.92;
-    const pts    = [];
-    for (let i = 0; i < n; i++) {
-        const a = (i * 2 * Math.PI) / n - Math.PI / 2;
-        pts.push({ x: cx + graphR * Math.cos(a), y: cy + graphR * Math.sin(a) });
+
+    // mystical.ps 107~122줄: 슐레플리 별다각형({p/q}) 산출
+    let starPoints, starStep, starRings;
+    if (compN <= 2) {
+        starPoints = 5;
+        starStep   = 2;
+        starRings  = 1;
+    } else {
+        const fullStep = Math.floor((compN * 2) / 5);
+        starRings  = gcd(compN, fullStep);
+        starPoints = compN / starRings;
+        starStep   = fullStep / starRings;
     }
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-            ctx.beginPath();
-            ctx.moveTo(pts[i].x, pts[i].y);
-            ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.stroke();
+
+    // star_rings개의 별을 (360/compN)°씩 회전시켜 겹쳐 그림 (mystical.ps 114~121줄)
+    for (let ringIdx = 0; ringIdx < starRings; ringIdx++) {
+        const ringOffset = (ringIdx * 2 * Math.PI) / compN;
+        const pts = [];
+        for (let i = 0; i < starPoints; i++) {
+            const a = ringOffset + (i * starStep * 2 * Math.PI) / compN - Math.PI / 2;
+            pts.push({ x: cx + graphR * Math.cos(a), y: cy + graphR * Math.sin(a) });
         }
+        ctx.beginPath();
+        pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.stroke();
     }
 }
 
