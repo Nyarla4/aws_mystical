@@ -25,3 +25,5 @@ not covered by the Mystical license.
 Mystical and its rendering engine were created by Denis M. Moskowitz.
 Project home: https://github.com/denismm/mystical_ps
 dmmlib home: https://github.com/denismm/dmmlib
+
+dmmlib 재배포는 저자 Denis Moskowitz로부터 개별 승인받음 (GitHub Issue, 2026-07-03)
