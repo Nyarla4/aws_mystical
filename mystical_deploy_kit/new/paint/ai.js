@@ -1,9 +1,19 @@
 /**
  * Mystical Language AI Detector Module (YOLOv8 Pose Multi-Task 단일 가중치 규격)
  * 파일명: ai.js
+ *
+ * 모델 스펙:
+ *   task: pose
+ *   input:  [1, 3, 704, 704]
+ *   output: [1, 132, 10164]  (4 bbox + 122 class + 6 keypoint)
+ *   클래스: 122종 (sigil 114 + text 4 + ring 3 + ring_link 1)
+ *   keypoint: ring_xarray / ring_array / ring_dict 전용
+ *             kp1 = ringCenter (cx, cy, conf)
+ *             kp2 = startMarker (sx, sy, conf)
  */
 
 const MYSTICAL_CLASSES = [
+    // 0~113: 시길 114종
     "sigil_RETURN", "sigil_COMPLETE", "sigil_pop", "sigil_exch", "sigil_dup", "sigil_copy",
     "sigil_index", "sigil_roll", "sigil_add", "sigil_div", "sigil_idiv", "sigil_mod",
     "sigil_mul", "sigil_sub", "sigil_abs", "sigil_neg", "sigil_sqrt", "sigil_atan",
@@ -23,22 +33,31 @@ const MYSTICAL_CLASSES = [
     "sigil_lineto", "sigil_rlineto", "sigil_arc", "sigil_arcn", "sigil_curveto", "sigil_rcurveto",
     "sigil_closepath", "sigil_clip", "sigil_stroke", "sigil_fill", "sigil_showpage", "sigil_findfont",
     "sigil_scalefont", "sigil_setfont", "sigil_currentfont", "sigil_selectfont", "sigil_show", "sigil_stringwidth",
-    // 차기 고도화 규격 신규 추가 클래스 6종 (총 120개 클래스)
-    "text_number", "text_string",
-    "ring_xarray", "ring_array", "ring_dict", "ring_start_marker"
+    // 114~121: 구조 클래스 8종
+    "text_number",   // 114
+    "text_string",   // 115
+    "ring_xarray",   // 116  ← keypoint 있음 (center + start_marker)
+    "ring_array",    // 117  ← keypoint 있음 (center + start_marker)
+    "ring_dict",     // 118  ← keypoint 있음 (center + start_marker)
+    "ring_link",     // 119
+    "text_name",     // 120
+    "text_arc",      // 121
 ];
+
+// keypoint를 가진 링 클래스 집합
+const RING_KP_CLASSES = new Set(["ring_xarray", "ring_array", "ring_dict"]);
 
 export class MysticalAI {
     constructor(modelUrl) {
         this.modelUrl = modelUrl;
-        this.session = null;
-        this.imgSize = 704; // 704 고해상도 유지
+        this.session  = null;
+        this.imgSize  = 704;
     }
 
     async init() {
         try {
             this.session = await ort.InferenceSession.create(this.modelUrl);
-            console.log("🟢 [MysticalAI] Multi-Task YOLO Pose Model Loaded.");
+            console.log("🟢 [MysticalAI] YOLOv8-Pose Model Loaded. classes=122, kpOffset=126");
         } catch (error) {
             console.error("🔴 [MysticalAI] Model Load Failed:", error);
         }
@@ -46,14 +65,14 @@ export class MysticalAI {
 
     preprocess(canvas) {
         const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = this.imgSize;
+        tempCanvas.width  = this.imgSize;
         tempCanvas.height = this.imgSize;
         const tempCtx = tempCanvas.getContext("2d");
-        
+
         tempCtx.fillStyle = "#FFFFFF";
         tempCtx.fillRect(0, 0, this.imgSize, this.imgSize);
         tempCtx.drawImage(canvas, 0, 0, this.imgSize, this.imgSize);
-        
+
         const imgData = tempCtx.getImageData(0, 0, this.imgSize, this.imgSize);
         const { data } = imgData;
 
@@ -63,17 +82,22 @@ export class MysticalAI {
         const bOffset = this.imgSize * this.imgSize * 2;
 
         for (let i = 0; i < this.imgSize * this.imgSize; i++) {
-            floatData[rOffset + i] = data[i * 4] / 255.0;     
-            floatData[gOffset + i] = data[i * 4 + 1] / 255.0; 
-            floatData[bOffset + i] = data[i * 4 + 2] / 255.0; 
+            floatData[rOffset + i] = data[i * 4]     / 255.0;
+            floatData[gOffset + i] = data[i * 4 + 1] / 255.0;
+            floatData[bOffset + i] = data[i * 4 + 2] / 255.0;
         }
 
         return new ort.Tensor("float32", floatData, [1, 3, this.imgSize, this.imgSize]);
     }
 
     /**
-     * 전면 개편된 단일 패스 예측 메서드
-     * @returns {Promise<Array>} BBox, 정렬 중심점, 마커 좌표를 완전 결합한 객체 배열
+     * 단일 패스 예측
+     * output shape: [1, 132, 10164]
+     *   rows 0~3:     bbox (cx, cy, w, h)
+     *   rows 4~125:   클래스 스코어 122종
+     *   rows 126~131: keypoint (kp1_x, kp1_y, kp1_conf, kp2_x, kp2_y, kp2_conf)
+     *
+     * @returns {Promise<Array>} NMS 적용된 탐지 객체 배열
      */
     async predict(canvas, scoreThreshold = 0.35, iouThreshold = 0.45) {
         if (!this.session) {
@@ -84,81 +108,76 @@ export class MysticalAI {
         const inputTensor = this.preprocess(canvas);
         const feeds = { [this.session.inputNames[0]]: inputTensor };
 
-        const outputMap = await this.session.run(feeds);
+        const outputMap    = await this.session.run(feeds);
         const outputTensor = outputMap[this.session.outputNames[0]];
-        const outputData = outputTensor.data; 
+        const outputData   = outputTensor.data;
 
-        const numClasses = MYSTICAL_CLASSES.length; // 120
-        const totalBoxes = outputTensor.dims[2];    // 앵커수 수집
+        const numClasses = MYSTICAL_CLASSES.length; // 122
+        const totalBoxes = outputTensor.dims[2];    // 10164
+        const kpOffset   = 4 + numClasses;          // 126
+
         const candidates = [];
-
-        // 고정 행 오프셋 정의
-        const kpOffset = 4 + numClasses; // 4 + 120 = 124번 행부터 키포인트 시작
 
         for (let boxIdx = 0; boxIdx < totalBoxes; boxIdx++) {
             let maxScore = 0;
-            let classId = -1;
+            let classId  = -1;
 
-            // 1. 120개 클래스에 대한 최대 스코어 탐색
+            // 122종 클래스 최대 스코어 탐색
             for (let c = 0; c < numClasses; c++) {
                 const score = outputData[(4 + c) * totalBoxes + boxIdx];
                 if (score > maxScore) {
                     maxScore = score;
-                    classId = c;
+                    classId  = c;
                 }
             }
 
-            // 임계값 필터링
-            if (maxScore >= scoreThreshold) {
-                const cx = outputData[0 * totalBoxes + boxIdx];
-                const cy = outputData[1 * totalBoxes + boxIdx];
-                const w  = outputData[2 * totalBoxes + boxIdx];
-                const h  = outputData[3 * totalBoxes + boxIdx];
+            if (maxScore < scoreThreshold) continue;
 
-                const x1 = cx - w / 2;
-                const y1 = cy - h / 2;
-                const className = MYSTICAL_CLASSES[classId];
+            const cx = outputData[0 * totalBoxes + boxIdx];
+            const cy = outputData[1 * totalBoxes + boxIdx];
+            const w  = outputData[2 * totalBoxes + boxIdx];
+            const h  = outputData[3 * totalBoxes + boxIdx];
+            const x1 = cx - w / 2;
+            const y1 = cy - h / 2;
 
-                // 초기 기하 데이터 셋업
-                let geometry = null;
+            const className = MYSTICAL_CLASSES[classId];
 
-                // 2. [결정론적 바인딩] 오직 링 구조체("ring_") 클래스일 때만 키포인트 파싱 진입
-                if (className.startsWith("ring_") && className !== "ring_start_marker") {
-                    // Keypoint 1: 구조체 중심점 (cx, cy)
-                    const rcx = outputData[(kpOffset + 0) * totalBoxes + boxIdx];
-                    const rcy = outputData[(kpOffset + 1) * totalBoxes + boxIdx];
-                    const rcConf = outputData[(kpOffset + 2) * totalBoxes + boxIdx];
+            // keypoint 파싱 — ring_xarray / ring_array / ring_dict 전용
+            let geometry = null;
+            if (RING_KP_CLASSES.has(className)) {
+                // Keypoint 1: 링 중심 (ringCenter)
+                const rcx    = outputData[(kpOffset + 0) * totalBoxes + boxIdx];
+                const rcy    = outputData[(kpOffset + 1) * totalBoxes + boxIdx];
+                const rcConf = outputData[(kpOffset + 2) * totalBoxes + boxIdx];
 
-                    // Keypoint 2: 시작점 마커 위치 (sx, sy)
-                    const smx = outputData[(kpOffset + 3) * totalBoxes + boxIdx];
-                    const smy = outputData[(kpOffset + 4) * totalBoxes + boxIdx];
-                    const smConf = outputData[(kpOffset + 5) * totalBoxes + boxIdx];
+                // Keypoint 2: 시작점 마커 (startMarker)
+                const smx    = outputData[(kpOffset + 3) * totalBoxes + boxIdx];
+                const smy    = outputData[(kpOffset + 4) * totalBoxes + boxIdx];
+                const smConf = outputData[(kpOffset + 5) * totalBoxes + boxIdx];
 
-                    geometry = {
-                        ringCenter: { x: rcx, y: rcy, confidence: rcConf },
-                        startMarker: { x: smx, y: smy, confidence: smConf }
-                    };
-                }
-
-                candidates.push({
-                    x: x1, y: y1, w, h,
-                    cx, cy, // BBox 가공 중심점
-                    score: maxScore,
-                    classId,
-                    className,
-                    geometry // 링 구조체 전용 컴포넌트 메타데이터 (일반 시질은 null)
-                });
+                geometry = {
+                    ringCenter:  { x: rcx, y: rcy, confidence: rcConf },
+                    startMarker: { x: smx, y: smy, confidence: smConf }
+                };
             }
+
+            candidates.push({
+                x: x1, y: y1, w, h,
+                cx, cy,
+                score: maxScore,
+                classId,
+                className,
+                geometry
+            });
         }
 
-        // 3. 중복 영역 억제(NMS) 후 반환
         return this.nonMaximumSuppression(candidates, iouThreshold);
     }
 
     nonMaximumSuppression(boxes, iouThreshold) {
         boxes.sort((a, b) => b.score - a.score);
         const selected = [];
-        const active = new Array(boxes.length).fill(true);
+        const active   = new Array(boxes.length).fill(true);
 
         for (let i = 0; i < boxes.length; i++) {
             if (!active[i]) continue;
@@ -178,7 +197,7 @@ export class MysticalAI {
                 const areaA = boxA.w * boxA.h;
                 const areaB = boxB.w * boxB.h;
                 const union = areaA + areaB - intersection;
-                const iou = intersection / union;
+                const iou   = intersection / union;
 
                 if (iou >= iouThreshold) {
                     active[j] = false;
