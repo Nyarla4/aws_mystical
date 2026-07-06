@@ -532,9 +532,9 @@ function assemblePSCode(sigilsByShape, shapeTree) {
         }
 
         // PostScript 예약 컨테이너 구조화 서식 적용
-        if (tool === "xarray") return `{ ${finalizedTokens.join(" ")} }`;
-        if (tool === "array")  return `[ ${finalizedTokens.join(" ")} ]`;
-        if (tool === "dict") {
+        if (tool === "ring_xarray") return `{ ${finalizedTokens.join(" ")} }`;
+        if (tool === "ring_array")  return `[ ${finalizedTokens.join(" ")} ]`;
+        if (tool === "ring_dict") {
             const pairs = [];
             for (let i = 0; i < finalizedTokens.length; i += 2) {
                 const key = finalizedTokens[i];
